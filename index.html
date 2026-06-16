@@ -345,18 +345,17 @@
                     <input type="date" id="entryDate">
                 </div>
                 <div class="form-group">
-                    <label>帳戶總值 (USD)</label>
-                    <input type="number" id="entryValue" placeholder="例如: 229068.15" step="0.01">
-                </div>
-                <div class="form-group">
-                    <label>當日獲利 (USD)</label>
+                    <label>當日獲利 (USD) <span style="color:var(--danger);font-size:0.8rem;">* 必填</span></label>
                     <input type="number" id="entryProfit" placeholder="例如: 3372.29" step="0.01">
                 </div>
-                <div class="form-group">
-                    <label>當日報酬率 (%)</label>
-                    <input type="number" id="entryReturn" placeholder="例如: 1.49" step="0.01">
+                <div class="form-group" style="margin-top:8px;padding:10px;background:var(--bg);border-radius:8px;">
+                    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px;">自動計算結果：</div>
+                    <div style="display:flex;gap:16px;">
+                        <div><span style="font-size:0.8rem;color:var(--text-muted);">帳戶總值:</span> <strong id="autoValue">-</strong></div>
+                        <div><span style="font-size:0.8rem;color:var(--text-muted);">報酬率:</span> <strong id="autoReturn">-</strong></div>
+                    </div>
                 </div>
-                <button class="btn btn-primary" onclick="addEntry()">新增紀錄</button>
+                <button class="btn btn-primary" onclick="addEntry()" style="margin-top:12px;">新增紀錄</button>
             </div>
 
             <!-- Chart -->
@@ -440,40 +439,51 @@
             return d.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' });
         }
 
+        // Auto-preview calculated values when profit is entered
+        document.getElementById('entryProfit').addEventListener('input', function() {
+            const profit = parseFloat(this.value);
+            if (isNaN(profit) || performanceData.length === 0) {
+                document.getElementById('autoValue').textContent = '-';
+                document.getElementById('autoReturn').textContent = '-';
+                return;
+            }
+            const sorted = [...performanceData].sort((a, b) => a.date.localeCompare(b.date));
+            const lastEntry = sorted[sorted.length - 1];
+            const newValue = lastEntry.value + profit;
+            const returnPct = (profit / lastEntry.value) * 100;
+            document.getElementById('autoValue').textContent = formatCurrency(newValue);
+            document.getElementById('autoReturn').textContent = returnPct.toFixed(2) + '%';
+        });
+
         function addEntry() {
             const date = document.getElementById('entryDate').value;
-            const value = parseFloat(document.getElementById('entryValue').value);
             const profit = parseFloat(document.getElementById('entryProfit').value);
-            const returnPct = parseFloat(document.getElementById('entryReturn').value);
 
-            if (!date || isNaN(value)) {
-                showNotification('請至少填寫日期和帳戶總值', 'error');
+            if (!date) {
+                showNotification('請填寫日期', 'error');
                 return;
             }
 
-            // Auto-calculate profit if not provided
-            let calculatedProfit = profit;
-            let calculatedReturn = returnPct;
-
-            if (isNaN(calculatedProfit) && performanceData.length > 0) {
-                const sorted = [...performanceData].sort((a, b) => a.date.localeCompare(b.date));
-                const lastEntry = sorted[sorted.length - 1];
-                calculatedProfit = value - lastEntry.value;
+            if (isNaN(profit)) {
+                showNotification('請填寫當日獲利金額', 'error');
+                return;
             }
 
-            if (isNaN(calculatedReturn) && !isNaN(calculatedProfit)) {
-                calculatedReturn = (calculatedProfit / (value - calculatedProfit)) * 100;
-            }
+            // Auto-calculate value and return from last entry
+            const sorted = [...performanceData].sort((a, b) => a.date.localeCompare(b.date));
+            const lastEntry = sorted[sorted.length - 1];
+            const calculatedValue = lastEntry.value + profit;
+            const calculatedReturn = (profit / lastEntry.value) * 100;
 
             // Check for duplicate date
             const existingIdx = performanceData.findIndex(d => d.date === date);
             if (existingIdx >= 0) {
                 performanceData[existingIdx] = {
-                    date, value, profit: calculatedProfit || 0, returnPct: calculatedReturn || 0
+                    date, value: calculatedValue, profit, returnPct: calculatedReturn
                 };
             } else {
                 performanceData.push({
-                    date, value, profit: calculatedProfit || 0, returnPct: calculatedReturn || 0
+                    date, value: calculatedValue, profit, returnPct: calculatedReturn
                 });
             }
 
@@ -482,9 +492,9 @@
             refreshAll();
 
             // Clear form
-            document.getElementById('entryValue').value = '';
             document.getElementById('entryProfit').value = '';
-            document.getElementById('entryReturn').value = '';
+            document.getElementById('autoValue').textContent = '-';
+            document.getElementById('autoReturn').textContent = '-';
 
             showNotification('紀錄已新增！', 'success');
         }
