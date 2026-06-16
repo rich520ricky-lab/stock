@@ -297,7 +297,7 @@
 <body>
     <div class="container">
         <h1>📈 美股交易績效追蹤器</h1>
-        <p class="subtitle">追蹤每日績效，預測何時達到目標獲利</p>
+        <p class="subtitle">追蹤每日績效，預測何時達到目標獲利 <span id="syncIndicator" style="font-size:0.8rem;margin-left:8px;">⏳ 連線中...</span></p>
 
         <div class="grid">
             <!-- Projection Box -->
@@ -402,6 +402,9 @@
     </div>
 
     <script>
+        // Backend API URL
+        const API_URL = 'https://stock-performance-backend.fly.dev';
+
         // Data storage
         let performanceData = JSON.parse(localStorage.getItem('stockPerformance') || '[]');
 
@@ -417,17 +420,61 @@
             { date: '2026-06-16', value: 229068.15, profit: 3372.29, returnPct: 1.49 },
         ];
 
-        // Initialize with seed data if empty
-        if (performanceData.length === 0) {
-            performanceData = [...seedData];
-            saveData();
-        }
-
         // Charts
         let valueChart, profitChart;
+        let syncStatus = 'offline';
 
         function saveData() {
             localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
+            syncToCloud();
+        }
+
+        async function syncToCloud() {
+            try {
+                await fetch(`${API_URL}/api/entries/bulk`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entries: performanceData })
+                });
+                setSyncStatus('synced');
+            } catch (e) {
+                setSyncStatus('offline');
+            }
+        }
+
+        async function loadFromCloud() {
+            try {
+                const res = await fetch(`${API_URL}/api/entries`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.length > 0) {
+                        performanceData = data;
+                        localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
+                        setSyncStatus('synced');
+                        refreshAll();
+                        return;
+                    }
+                }
+            } catch (e) {
+                setSyncStatus('offline');
+            }
+            // Fallback: use local data or seed data
+            if (performanceData.length === 0) {
+                performanceData = [...seedData];
+                saveData();
+            }
+        }
+
+        function setSyncStatus(status) {
+            syncStatus = status;
+            const el = document.getElementById('syncIndicator');
+            if (status === 'synced') {
+                el.textContent = '☁️ 雲端已同步';
+                el.style.color = 'var(--success)';
+            } else {
+                el.textContent = '📱 僅本機';
+                el.style.color = 'var(--text-muted)';
+            }
         }
 
         function formatCurrency(amount) {
@@ -457,7 +504,7 @@
             document.getElementById('autoReturn').style.color = profit >= 0 ? 'var(--success)' : 'var(--danger)';
         });
 
-        function addEntry() {
+        async function addEntry() {
             const date = document.getElementById('entryDate').value;
             const profit = parseFloat(document.getElementById('entryProfit').value);
 
@@ -477,16 +524,14 @@
             const calculatedValue = lastEntry.value + profit;
             const calculatedReturn = (profit / lastEntry.value) * 100;
 
+            const newEntry = { date, value: calculatedValue, profit, returnPct: calculatedReturn };
+
             // Check for duplicate date
             const existingIdx = performanceData.findIndex(d => d.date === date);
             if (existingIdx >= 0) {
-                performanceData[existingIdx] = {
-                    date, value: calculatedValue, profit, returnPct: calculatedReturn
-                };
+                performanceData[existingIdx] = newEntry;
             } else {
-                performanceData.push({
-                    date, value: calculatedValue, profit, returnPct: calculatedReturn
-                });
+                performanceData.push(newEntry);
             }
 
             performanceData.sort((a, b) => a.date.localeCompare(b.date));
@@ -498,7 +543,7 @@
             document.getElementById('autoValue').textContent = '-';
             document.getElementById('autoReturn').textContent = '-';
 
-            showNotification('紀錄已新增！', 'success');
+            showNotification('紀錄已新增並同步至雲端！', 'success');
         }
 
         function deleteEntry(index) {
@@ -752,8 +797,8 @@
         // Set default date to today
         document.getElementById('entryDate').valueAsDate = new Date();
 
-        // Initialize
-        refreshAll();
+        // Initialize: load from cloud first, fallback to local
+        loadFromCloud().then(() => refreshAll());
     </script>
 </body>
 </html>
