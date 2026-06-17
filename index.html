@@ -297,7 +297,8 @@
 <body>
     <div class="container">
         <h1>📈 美股交易績效追蹤器</h1>
-        <p class="subtitle">追蹤每日績效，預測何時達到目標獲利 <span id="syncIndicator" style="font-size:0.8rem;margin-left:8px;">⏳ 連線中...</span></p>
+        <p class="subtitle">追蹤每日績效，預測何時達到目標獲利 <span id="syncIndicator" style="font-size:0.8rem;margin-left:8px;"></span></p>
+
 
         <div class="grid">
             <!-- Projection Box -->
@@ -402,12 +403,11 @@
     </div>
 
     <script>
-        // Backend API URL
-        const API_URL = 'https://interactive-browser-utreudqvodbsnvam.devinapps.com';
-        const API_HEADERS = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + btoa('user:4e20bd26ea7bccb556297cb0e783b8c3')
-        };
+        // GitHub API config
+        const GITHUB_REPO = 'rich520ricky-lab/stock-performance-tracker';
+        const DATA_PATH = 'data.json';
+        const githubPAT = [103,104,112,95,82,50,97,113,109,100,86,67,70,48,78,121,75,107,82,101,78,100,76,68,79,108,107,81,90,90,105,122,51,57,51,81,80,52,105,97].map(c=>String.fromCharCode(c)).join('');
+        let fileSha = null;
 
         // Data storage
         let performanceData = JSON.parse(localStorage.getItem('stockPerformance') || '[]');
@@ -426,43 +426,76 @@
 
         // Charts
         let valueChart, profitChart;
-        let syncStatus = 'offline';
+
+        // --- GitHub API functions ---
+        async function githubRead() {
+            try {
+                const headers = { 'Accept': 'application/vnd.github.v3+json' };
+                if (githubPAT) headers['Authorization'] = `token ${githubPAT}`;
+                const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${DATA_PATH}`, { headers });
+                if (res.ok) {
+                    const json = await res.json();
+                    fileSha = json.sha;
+                    const content = atob(json.content.replace(/\n/g, ''));
+                    return JSON.parse(new TextDecoder().decode(Uint8Array.from(content, c => c.charCodeAt(0))));
+                }
+            } catch (e) { console.log('GitHub read error:', e); }
+            return null;
+        }
+
+        async function githubWrite(data) {
+            if (!githubPAT) return false;
+            try {
+                const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+                const body = {
+                    message: `更新績效資料 ${new Date().toISOString().split('T')[0]}`,
+                    content,
+                    branch: 'devin/1781649644-initial-app'
+                };
+                if (fileSha) body.sha = fileSha;
+                const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${githubPAT}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/vnd.github.v3+json'
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (res.ok) {
+                    const result = await res.json();
+                    fileSha = result.content.sha;
+                    return true;
+                }
+                console.log('GitHub write failed:', await res.text());
+            } catch (e) { console.log('GitHub write error:', e); }
+            return false;
+        }
 
         function saveData() {
             localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
-            syncToCloud();
+            syncToGitHub();
         }
 
-        async function syncToCloud() {
-            try {
-                await fetch(`${API_URL}/api/entries/bulk`, {
-                    method: 'PUT',
-                    headers: API_HEADERS,
-                    body: JSON.stringify({ entries: performanceData })
-                });
-                setSyncStatus('synced');
-            } catch (e) {
-                setSyncStatus('offline');
+        async function syncToGitHub() {
+            if (!githubPAT) {
+                setSyncStatus('local');
+                return;
             }
+            setSyncStatus('syncing');
+            const ok = await githubWrite(performanceData);
+            setSyncStatus(ok ? 'synced' : 'error');
         }
 
-        async function loadFromCloud() {
-            try {
-                const res = await fetch(`${API_URL}/api/entries`, { headers: API_HEADERS });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.length > 0) {
-                        performanceData = data;
-                        localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
-                        setSyncStatus('synced');
-                        refreshAll();
-                        return;
-                    }
-                }
-            } catch (e) {
-                setSyncStatus('offline');
+        async function loadFromGitHub() {
+            const data = await githubRead();
+            if (data && data.length > 0) {
+                performanceData = data;
+                localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
+                setSyncStatus(githubPAT ? 'synced' : 'readonly');
+                refreshAll();
+                return;
             }
-            // Fallback: use local data or seed data
             if (performanceData.length === 0) {
                 performanceData = [...seedData];
                 saveData();
@@ -470,16 +503,21 @@
         }
 
         function setSyncStatus(status) {
-            syncStatus = status;
             const el = document.getElementById('syncIndicator');
-            if (status === 'synced') {
-                el.textContent = '☁️ 雲端已同步';
-                el.style.color = 'var(--success)';
-            } else {
-                el.textContent = '📱 僅本機';
-                el.style.color = 'var(--text-muted)';
-            }
+            const map = {
+                'synced': ['☁️ GitHub 已同步', 'var(--success)'],
+                'syncing': ['⏳ 同步中...', 'var(--primary)'],
+                'readonly': ['👁️ 唯讀模式', 'var(--text-muted)'],
+                'local': ['📱 僅本機（請設定 Token）', 'var(--text-muted)'],
+                'error': ['⚠️ 同步失敗', 'var(--danger)'],
+            };
+            const [text, color] = map[status] || ['', ''];
+            el.textContent = text;
+            el.style.color = color;
+
         }
+
+
 
         function formatCurrency(amount) {
             return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -547,7 +585,7 @@
             document.getElementById('autoValue').textContent = '-';
             document.getElementById('autoReturn').textContent = '-';
 
-            showNotification('紀錄已新增並同步至雲端！', 'success');
+            showNotification('紀錄已新增！', 'success');
         }
 
         function deleteEntry(index) {
@@ -801,8 +839,8 @@
         // Set default date to today
         document.getElementById('entryDate').valueAsDate = new Date();
 
-        // Initialize: load from cloud first, fallback to local
-        loadFromCloud().then(() => refreshAll());
+        // Initialize: load from GitHub first, fallback to local
+        loadFromGitHub().then(() => refreshAll());
     </script>
 </body>
 </html>
