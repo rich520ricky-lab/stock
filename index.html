@@ -403,7 +403,11 @@
 
     <script>
         // Backend API URL
-        const API_URL = 'https://stock-performance-backend.fly.dev';
+        const API_URL = 'https://interactive-browser-utreudqvodbsnvam.devinapps.com';
+        const API_HEADERS = {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + btoa('user:4e20bd26ea7bccb556297cb0e783b8c3')
+        };
 
         // Data storage
         let performanceData = JSON.parse(localStorage.getItem('stockPerformance') || '[]');
@@ -433,7 +437,7 @@
             try {
                 await fetch(`${API_URL}/api/entries/bulk`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: API_HEADERS,
                     body: JSON.stringify({ entries: performanceData })
                 });
                 setSyncStatus('synced');
@@ -444,7 +448,7 @@
 
         async function loadFromCloud() {
             try {
-                const res = await fetch(`${API_URL}/api/entries`);
+                const res = await fetch(`${API_URL}/api/entries`, { headers: API_HEADERS });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.length > 0) {
