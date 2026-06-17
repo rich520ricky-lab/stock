@@ -211,11 +211,15 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #fff;
             border-radius: 12px;
-            padding: 12px 24px;
+            padding: 10px 24px;
+            text-align: center;
+        }
+
+        .projection-row1 {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 16px;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
@@ -228,7 +232,7 @@
         }
 
         .projection-date {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 700;
             margin: 0;
         }
@@ -236,6 +240,7 @@
         .projection-detail {
             font-size: 0.8rem;
             opacity: 0.85;
+            margin: 2px 0;
         }
 
         .target-input-group {
@@ -310,14 +315,16 @@
         <div class="grid">
             <!-- Projection Box - Full Width -->
             <div class="projection-box full-width">
-                <h2>🎯 預測達標日期</h2>
-                <div class="projection-date" id="projectionDate">計算中...</div>
-                <div class="projection-detail" id="projectionDetail"></div>
-                <div style="display:flex;align-items:center;gap:6px;">
-                    <label style="color: rgba(255,255,255,0.8);font-size:0.8rem;margin:0;white-space:nowrap;">目標:</label>
-                    <input type="number" id="targetAmount" value="10000" min="0" step="100" style="width:100px;padding:4px 8px;font-size:0.85rem;">
-                    <button class="btn" style="background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4);padding:4px 12px;font-size:0.8rem;" onclick="updateProjection()">更新</button>
+                <div class="projection-row1">
+                    <h2>🎯 預測達標日期</h2>
+                    <div class="projection-date" id="projectionDate">計算中...</div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <label style="color: rgba(255,255,255,0.8);font-size:0.8rem;margin:0;white-space:nowrap;">目標$</label>
+                        <input type="number" id="targetAmount" value="10000" min="0" step="100" style="width:90px;padding:3px 6px;font-size:0.85rem;">
+                        <button class="btn" style="background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4);padding:3px 10px;font-size:0.8rem;" onclick="updateProjection()">更新</button>
+                    </div>
                 </div>
+                <div class="projection-detail" id="projectionDetail"></div>
             </div>
 
             <!-- Stats Card -->
