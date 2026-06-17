@@ -1,10 +1,56 @@
 [
-  {"date": "2026-06-05", "value": 207715.48, "profit": 2828.52, "returnPct": 1.38},
-  {"date": "2026-06-08", "value": 209199.38, "profit": 1483.90, "returnPct": 0.71},
-  {"date": "2026-06-09", "value": 213800.98, "profit": 4601.60, "returnPct": 2.20},
-  {"date": "2026-06-10", "value": 217940.38, "profit": 4139.40, "returnPct": 1.94},
-  {"date": "2026-06-11", "value": 221920.23, "profit": 3979.85, "returnPct": 1.83},
-  {"date": "2026-06-12", "value": 224104.81, "profit": 2184.58, "returnPct": 0.98},
-  {"date": "2026-06-15", "value": 225695.86, "profit": 1591.05, "returnPct": 0.71},
-  {"date": "2026-06-16", "value": 229068.15, "profit": 3372.29, "returnPct": 1.49}
+  {
+    "date": "2026-06-05",
+    "value": 207715.48,
+    "profit": 2828.52,
+    "returnPct": 1.38
+  },
+  {
+    "date": "2026-06-08",
+    "value": 209199.38,
+    "profit": 1483.9,
+    "returnPct": 0.71
+  },
+  {
+    "date": "2026-06-09",
+    "value": 213800.98,
+    "profit": 4601.6,
+    "returnPct": 2.2
+  },
+  {
+    "date": "2026-06-10",
+    "value": 217940.38,
+    "profit": 4139.4,
+    "returnPct": 1.94
+  },
+  {
+    "date": "2026-06-11",
+    "value": 221920.23,
+    "profit": 3979.85,
+    "returnPct": 1.83
+  },
+  {
+    "date": "2026-06-12",
+    "value": 224104.81,
+    "profit": 2184.58,
+    "returnPct": 0.98
+  },
+  {
+    "date": "2026-06-15",
+    "value": 225695.86,
+    "profit": 1591.05,
+    "returnPct": 0.71
+  },
+  {
+    "date": "2026-06-16",
+    "value": 229068.15,
+    "profit": 3372.29,
+    "returnPct": 1.49
+  },
+  {
+    "date": "2026-06-17",
+    "value": 234068.15,
+    "profit": 5000,
+    "returnPct": 2.1827565290067605
+  }
 ]
