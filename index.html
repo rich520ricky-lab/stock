@@ -360,9 +360,9 @@
             </div>
 
             <!-- Chart -->
-            <div class="card">
-                <h2>📉 帳戶價值走勢</h2>
-                <div class="chart-container">
+            <div class="card full-width">
+                <h2>📉 帳戶價值走勢（含預測）</h2>
+                <div class="chart-container" style="height:400px;">
                     <canvas id="valueChart"></canvas>
                 </div>
             </div>
@@ -685,52 +685,139 @@
             }).join('');
         }
 
+        function generateProjection(startDate, startValue, avgDailyReturn, years) {
+            const points = [];
+            const totalMonths = years * 12;
+            let currentValue = startValue;
+            let d = new Date(startDate + 'T00:00:00');
+            let tradingDayCount = 0;
+            const endDate = new Date(d);
+            endDate.setFullYear(endDate.getFullYear() + years);
+
+            // Sample monthly to keep chart readable
+            const nextMonth = new Date(d);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            nextMonth.setDate(1);
+
+            while (d <= endDate) {
+                d.setDate(d.getDate() + 1);
+                const day = d.getDay();
+                if (day !== 0 && day !== 6) {
+                    currentValue *= (1 + avgDailyReturn);
+                    tradingDayCount++;
+                }
+                // Sample on the 1st of each month or at end
+                if ((d.getDate() === 1 && d >= nextMonth) || d >= endDate) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    points.push({ x: dateStr, y: currentValue });
+                }
+            }
+            return points;
+        }
+
         function updateCharts() {
             const sorted = [...performanceData].sort((a, b) => a.date.localeCompare(b.date));
-            const labels = sorted.map(d => d.date);
-            const values = sorted.map(d => d.value);
             const profits = sorted.map(d => d.profit);
 
-            // Value Chart
+            // Calculate avg daily return for projections
+            const returns = sorted.map(d => d.returnPct).filter(r => !isNaN(r) && r !== 0);
+            const avgReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length / 100 : 0;
+            const lastEntry = sorted[sorted.length - 1];
+            const lastDate = lastEntry ? lastEntry.date : '2026-06-16';
+            const lastValue = lastEntry ? lastEntry.value : 229068;
+
+            // Historical data points
+            const historicalData = sorted.map(d => ({ x: d.date, y: d.value }));
+
+            // Generate projections
+            const proj1y = generateProjection(lastDate, lastValue, avgReturn, 1);
+            const proj2y = generateProjection(lastDate, lastValue, avgReturn, 2);
+            const proj3y = generateProjection(lastDate, lastValue, avgReturn, 3);
+
+            // Value Chart with projections
             const valueCtx = document.getElementById('valueChart').getContext('2d');
             if (valueChart) valueChart.destroy();
             valueChart = new Chart(valueCtx, {
                 type: 'line',
                 data: {
-                    labels,
-                    datasets: [{
-                        label: '帳戶總值 (USD)',
-                        data: values,
-                        borderColor: '#1a73e8',
-                        backgroundColor: 'rgba(26, 115, 232, 0.1)',
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#1a73e8',
-                    }]
+                    datasets: [
+                        {
+                            label: '實際帳戶總值',
+                            data: historicalData,
+                            borderColor: '#1a73e8',
+                            backgroundColor: 'rgba(26, 115, 232, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#1a73e8',
+                            borderWidth: 2,
+                        },
+                        {
+                            label: '1 年預測',
+                            data: [{ x: lastDate, y: lastValue }, ...proj1y],
+                            borderColor: '#0f9d58',
+                            borderDash: [6, 3],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            fill: false,
+                        },
+                        {
+                            label: '2 年預測',
+                            data: [{ x: lastDate, y: lastValue }, ...proj2y],
+                            borderColor: '#f4b400',
+                            borderDash: [6, 3],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            fill: false,
+                        },
+                        {
+                            label: '3 年預測',
+                            data: [{ x: lastDate, y: lastValue }, ...proj3y],
+                            borderColor: '#db4437',
+                            borderDash: [6, 3],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            fill: false,
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false },
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { usePointStyle: true, padding: 16 }
+                        },
                         tooltip: {
                             callbacks: {
-                                label: ctx => formatCurrency(ctx.parsed.y)
+                                title: ctx => ctx[0].raw.x,
+                                label: ctx => `${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`
                             }
                         }
                     },
                     scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'month', displayFormats: { month: 'yyyy-MM' } },
+                            title: { display: true, text: '日期' }
+                        },
                         y: {
                             ticks: {
-                                callback: v => '$' + (v/1000).toFixed(0) + 'k'
-                            }
+                                callback: v => v >= 1000000 ? '$' + (v/1000000).toFixed(1) + 'M' : '$' + (v/1000).toFixed(0) + 'k'
+                            },
+                            title: { display: true, text: '帳戶價值 (USD)' }
                         }
                     }
                 }
             });
 
             // Profit Chart
+            const labels = sorted.map(d => d.date);
             const profitCtx = document.getElementById('profitChart').getContext('2d');
             if (profitChart) profitChart.destroy();
             profitChart = new Chart(profitCtx, {
