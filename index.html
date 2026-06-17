@@ -301,12 +301,12 @@
 
 
         <div class="grid">
-            <!-- Projection Box -->
-            <div class="projection-box">
+            <!-- Projection Box - Full Width -->
+            <div class="projection-box full-width">
                 <h2>🎯 預測達標日期</h2>
                 <div class="projection-date" id="projectionDate">計算中...</div>
                 <div class="projection-detail" id="projectionDetail"></div>
-                <div class="target-input-group" style="margin-top: 16px;">
+                <div class="target-input-group" style="margin-top: 16px; max-width: 400px; margin-left: auto; margin-right: auto;">
                     <div class="form-group">
                         <label style="color: rgba(255,255,255,0.8);">每日目標獲利 (USD)</label>
                         <input type="number" id="targetAmount" value="10000" min="0" step="100">
@@ -359,7 +359,15 @@
                 <button class="btn btn-primary" onclick="addEntry()" style="margin-top:12px;">新增紀錄</button>
             </div>
 
-            <!-- Chart -->
+            <!-- Daily Profit Projection Chart -->
+            <div class="card full-width">
+                <h2>💰 每日獲利走勢（含預測）</h2>
+                <div class="chart-container" style="height:400px;">
+                    <canvas id="profitProjChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Account Value Projection Chart -->
             <div class="card full-width">
                 <h2>📉 帳戶價值走勢（含預測）</h2>
                 <div class="chart-container" style="height:400px;">
@@ -367,9 +375,9 @@
                 </div>
             </div>
 
-            <!-- Daily Profit Chart -->
+            <!-- Daily Profit Bar Chart -->
             <div class="card full-width">
-                <h2>💰 每日獲利趨勢</h2>
+                <h2>📊 每日獲利柱狀圖</h2>
                 <div class="chart-container">
                     <canvas id="profitChart"></canvas>
                 </div>
@@ -425,7 +433,7 @@
         ];
 
         // Charts
-        let valueChart, profitChart;
+        let valueChart, profitChart, profitProjChart;
 
         // --- GitHub API functions ---
         async function githubRead() {
@@ -686,15 +694,13 @@
         }
 
         function generateProjection(startDate, startValue, avgDailyReturn, years) {
-            const points = [];
-            const totalMonths = years * 12;
+            const valuePoints = [];
+            const profitPoints = [];
             let currentValue = startValue;
             let d = new Date(startDate + 'T00:00:00');
-            let tradingDayCount = 0;
             const endDate = new Date(d);
             endDate.setFullYear(endDate.getFullYear() + years);
 
-            // Sample monthly to keep chart readable
             const nextMonth = new Date(d);
             nextMonth.setMonth(nextMonth.getMonth() + 1);
             nextMonth.setDate(1);
@@ -703,16 +709,16 @@
                 d.setDate(d.getDate() + 1);
                 const day = d.getDay();
                 if (day !== 0 && day !== 6) {
+                    const dailyProfit = currentValue * avgDailyReturn;
                     currentValue *= (1 + avgDailyReturn);
-                    tradingDayCount++;
                 }
-                // Sample on the 1st of each month or at end
                 if ((d.getDate() === 1 && d >= nextMonth) || d >= endDate) {
                     const dateStr = d.toISOString().split('T')[0];
-                    points.push({ x: dateStr, y: currentValue });
+                    valuePoints.push({ x: dateStr, y: currentValue });
+                    profitPoints.push({ x: dateStr, y: currentValue * avgDailyReturn });
                 }
             }
-            return points;
+            return { valuePoints, profitPoints };
         }
 
         function updateCharts() {
@@ -725,16 +731,100 @@
             const lastEntry = sorted[sorted.length - 1];
             const lastDate = lastEntry ? lastEntry.date : '2026-06-16';
             const lastValue = lastEntry ? lastEntry.value : 229068;
+            const lastProfit = lastEntry ? lastEntry.profit : 3372;
 
             // Historical data points
             const historicalData = sorted.map(d => ({ x: d.date, y: d.value }));
+            const historicalProfitData = sorted.map(d => ({ x: d.date, y: d.profit }));
 
-            // Generate projections
+            // Generate projections (returns { valuePoints, profitPoints })
             const proj1y = generateProjection(lastDate, lastValue, avgReturn, 1);
             const proj2y = generateProjection(lastDate, lastValue, avgReturn, 2);
             const proj3y = generateProjection(lastDate, lastValue, avgReturn, 3);
 
-            // Value Chart with projections
+            // --- Daily Profit Projection Chart ---
+            const profitProjCtx = document.getElementById('profitProjChart').getContext('2d');
+            if (profitProjChart) profitProjChart.destroy();
+            profitProjChart = new Chart(profitProjCtx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: '實際每日獲利',
+                            data: historicalProfitData,
+                            borderColor: '#1a73e8',
+                            backgroundColor: 'rgba(26, 115, 232, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#1a73e8',
+                            borderWidth: 2,
+                        },
+                        {
+                            label: '1 年預測',
+                            data: [{ x: lastDate, y: lastProfit }, ...proj1y.profitPoints],
+                            borderColor: '#0f9d58',
+                            borderDash: [6, 3],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            fill: false,
+                        },
+                        {
+                            label: '2 年預測',
+                            data: [{ x: lastDate, y: lastProfit }, ...proj2y.profitPoints],
+                            borderColor: '#f4b400',
+                            borderDash: [6, 3],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            fill: false,
+                        },
+                        {
+                            label: '3 年預測',
+                            data: [{ x: lastDate, y: lastProfit }, ...proj3y.profitPoints],
+                            borderColor: '#db4437',
+                            borderDash: [6, 3],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            fill: false,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { usePointStyle: true, padding: 16 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: ctx => ctx[0].raw.x,
+                                label: ctx => `${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'month', displayFormats: { month: 'yyyy-MM' } },
+                            title: { display: true, text: '日期' }
+                        },
+                        y: {
+                            ticks: {
+                                callback: v => v >= 1000000 ? '$' + (v/1000000).toFixed(1) + 'M' : '$' + (v/1000).toFixed(0) + 'k'
+                            },
+                            title: { display: true, text: '每日獲利 (USD)' }
+                        }
+                    }
+                }
+            });
+
+            // --- Account Value Projection Chart ---
             const valueCtx = document.getElementById('valueChart').getContext('2d');
             if (valueChart) valueChart.destroy();
             valueChart = new Chart(valueCtx, {
@@ -754,7 +844,7 @@
                         },
                         {
                             label: '1 年預測',
-                            data: [{ x: lastDate, y: lastValue }, ...proj1y],
+                            data: [{ x: lastDate, y: lastValue }, ...proj1y.valuePoints],
                             borderColor: '#0f9d58',
                             borderDash: [6, 3],
                             tension: 0.3,
@@ -764,7 +854,7 @@
                         },
                         {
                             label: '2 年預測',
-                            data: [{ x: lastDate, y: lastValue }, ...proj2y],
+                            data: [{ x: lastDate, y: lastValue }, ...proj2y.valuePoints],
                             borderColor: '#f4b400',
                             borderDash: [6, 3],
                             tension: 0.3,
@@ -774,7 +864,7 @@
                         },
                         {
                             label: '3 年預測',
-                            data: [{ x: lastDate, y: lastValue }, ...proj3y],
+                            data: [{ x: lastDate, y: lastValue }, ...proj3y.valuePoints],
                             borderColor: '#db4437',
                             borderDash: [6, 3],
                             tension: 0.3,
