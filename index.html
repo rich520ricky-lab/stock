@@ -70,6 +70,76 @@
             padding: 24px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             border: 1px solid var(--border);
+            transition: box-shadow 0.2s, opacity 0.2s;
+        }
+
+        .card.dragging {
+            opacity: 0.5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .card.drag-over {
+            border-top: 3px solid var(--primary);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: grab;
+            user-select: none;
+            margin-bottom: 16px;
+        }
+
+        .card-header:active {
+            cursor: grabbing;
+        }
+
+        .card-header h2 {
+            margin: 0;
+            flex: 1;
+        }
+
+        .card-header .drag-handle {
+            color: var(--text-muted);
+            margin-right: 8px;
+            font-size: 1rem;
+            cursor: grab;
+        }
+
+        .card-header .toggle-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--text-muted);
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .card-header .toggle-btn:hover {
+            background: var(--bg);
+        }
+
+        .card-body {
+            transition: max-height 0.3s ease, opacity 0.2s ease;
+            overflow: hidden;
+        }
+
+        .card-body.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .card.collapsed-card {
+            padding-bottom: 12px;
+        }
+
+        .card.collapsed-card .card-header {
+            margin-bottom: 0;
         }
 
         .card h2 {
@@ -416,6 +486,121 @@
         .calendar-grid .day-cell.no-data .day-num {
             color: var(--text-muted);
         }
+
+        /* RWD enhancements */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.3rem;
+            }
+
+            .subtitle {
+                font-size: 0.8rem;
+                margin-bottom: 16px;
+            }
+
+            .grid {
+                gap: 12px;
+            }
+
+            .card {
+                padding: 14px;
+            }
+
+            .projection-box {
+                padding: 8px 12px;
+            }
+
+            .projection-row1 {
+                gap: 8px;
+            }
+
+            .projection-box h2 {
+                font-size: 0.85rem;
+            }
+
+            .projection-date {
+                font-size: 1.1rem;
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .stat-item {
+                padding: 8px;
+            }
+
+            .stat-item .value {
+                font-size: 1rem;
+            }
+
+            .chart-container {
+                height: 250px !important;
+            }
+
+            .calendar-grid .day-cell {
+                min-height: 50px;
+                padding: 2px;
+            }
+
+            .calendar-grid .day-cell .day-num {
+                font-size: 0.75rem;
+            }
+
+            .calendar-grid .day-cell .day-profit {
+                font-size: 0.65rem;
+            }
+
+            .calendar-grid .day-cell .day-return {
+                font-size: 0.6rem;
+            }
+
+            .calendar-summary {
+                flex-direction: column;
+                gap: 4px;
+                align-items: flex-start;
+            }
+
+            table {
+                font-size: 0.75rem;
+            }
+
+            th, td {
+                padding: 6px 4px;
+            }
+
+            .card-header .drag-handle {
+                font-size: 0.85rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .projection-row1 {
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .calendar-grid .day-cell {
+                min-height: 42px;
+            }
+
+            .calendar-grid .day-cell .day-profit {
+                font-size: 0.6rem;
+            }
+
+            .calendar-grid .day-cell .day-return {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -424,8 +609,8 @@
         <p class="subtitle">追蹤每日績效，預測何時達到目標獲利 <span id="syncIndicator" style="font-size:0.8rem;margin-left:8px;"></span></p>
 
 
-        <div class="grid">
-            <!-- Projection Box - Full Width -->
+        <div class="grid" id="cardContainer">
+            <!-- Projection Box - Full Width (not draggable) -->
             <div class="projection-box full-width">
                 <div class="projection-row1">
                     <h2>🎯 預測達標日期</h2>
@@ -440,108 +625,150 @@
             </div>
 
             <!-- Stats Card -->
-            <div class="card">
-                <h2>📊 績效統計</h2>
-                <div class="stat-grid">
-                    <div class="stat-item">
-                        <div class="label">平均日獲利</div>
-                        <div class="value positive" id="avgDaily">-</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="label">平均日報酬率</div>
-                        <div class="value positive" id="avgReturn">-</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="label">最高單日獲利</div>
-                        <div class="value positive" id="maxDaily">-</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="label">目前帳戶價值</div>
-                        <div class="value target" id="currentValue">-</div>
+            <div class="card draggable-card" data-card-id="stats">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>📊 績效統計</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
+                </div>
+                <div class="card-body">
+                    <div class="stat-grid">
+                        <div class="stat-item">
+                            <div class="label">平均日獲利</div>
+                            <div class="value positive" id="avgDaily">-</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">平均日報酬率</div>
+                            <div class="value positive" id="avgReturn">-</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">最高單日獲利</div>
+                            <div class="value positive" id="maxDaily">-</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">目前帳戶價值</div>
+                            <div class="value target" id="currentValue">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Add Entry Form -->
-            <div class="card">
-                <h2>➕ 新增每日績效</h2>
-                <div class="form-group">
-                    <label>日期</label>
-                    <input type="date" id="entryDate">
+            <div class="card draggable-card" data-card-id="addEntry">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>➕ 新增每日績效</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
                 </div>
-                <div class="form-group">
-                    <label>當日獲利 (USD) <span style="color:var(--danger);font-size:0.8rem;">* 必填</span></label>
-                    <input type="number" id="entryProfit" placeholder="獲利填正數，虧損填負數，例如: 3372.29 或 -1500" step="0.01">
-                </div>
-                <div class="form-group" style="margin-top:8px;padding:10px;background:var(--bg);border-radius:8px;">
-                    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px;">自動計算結果：</div>
-                    <div style="display:flex;gap:16px;">
-                        <div><span style="font-size:0.8rem;color:var(--text-muted);">帳戶總值:</span> <strong id="autoValue">-</strong></div>
-                        <div><span style="font-size:0.8rem;color:var(--text-muted);">報酬率:</span> <strong id="autoReturn">-</strong></div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>日期</label>
+                        <input type="date" id="entryDate">
                     </div>
+                    <div class="form-group">
+                        <label>當日獲利 (USD) <span style="color:var(--danger);font-size:0.8rem;">* 必填</span></label>
+                        <input type="number" id="entryProfit" placeholder="獲利填正數，虧損填負數，例如: 3372.29 或 -1500" step="0.01">
+                    </div>
+                    <div class="form-group" style="margin-top:8px;padding:10px;background:var(--bg);border-radius:8px;">
+                        <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px;">自動計算結果：</div>
+                        <div style="display:flex;gap:16px;">
+                            <div><span style="font-size:0.8rem;color:var(--text-muted);">帳戶總值:</span> <strong id="autoValue">-</strong></div>
+                            <div><span style="font-size:0.8rem;color:var(--text-muted);">報酬率:</span> <strong id="autoReturn">-</strong></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addEntry()" style="margin-top:12px;">新增紀錄</button>
                 </div>
-                <button class="btn btn-primary" onclick="addEntry()" style="margin-top:12px;">新增紀錄</button>
             </div>
 
             <!-- Daily Profit Projection Chart -->
-            <div class="card full-width">
-                <h2>💰 每日獲利走勢（含預測）</h2>
-                <div class="chart-container" style="height:400px;">
-                    <canvas id="profitProjChart"></canvas>
+            <div class="card full-width draggable-card" data-card-id="profitProj">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>💰 每日獲利走勢（含預測）</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container" style="height:400px;">
+                        <canvas id="profitProjChart"></canvas>
+                    </div>
                 </div>
             </div>
 
             <!-- Account Value Projection Chart -->
-            <div class="card full-width">
-                <h2>📉 帳戶價值走勢（含預測）</h2>
-                <div class="chart-container" style="height:400px;">
-                    <canvas id="valueChart"></canvas>
+            <div class="card full-width draggable-card" data-card-id="valueProj">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>📉 帳戶價值走勢（含預測）</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container" style="height:400px;">
+                        <canvas id="valueChart"></canvas>
+                    </div>
                 </div>
             </div>
 
             <!-- Daily Profit Bar Chart -->
-            <div class="card full-width">
-                <h2>📊 每日獲利柱狀圖</h2>
-                <div class="chart-container">
-                    <canvas id="profitChart"></canvas>
+            <div class="card full-width draggable-card" data-card-id="profitBar">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>📊 每日獲利柱狀圖</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
                 </div>
-            </div>
-
-            <!-- Data Table -->
-            <div class="card full-width">
-                <h2>📋 績效紀錄</h2>
-                <div class="export-btns">
-                    <button class="btn btn-outline" onclick="exportCSV()">匯出 CSV</button>
-                    <button class="btn btn-outline" onclick="importCSV()">匯入 CSV</button>
-                    <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
-                </div>
-                <div class="table-wrapper" style="margin-top: 12px;">
-                    <table id="dataTable">
-                        <thead>
-                            <tr>
-                                <th>日期</th>
-                                <th>帳戶總值</th>
-                                <th>當日獲利</th>
-                                <th>報酬率</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                        </tbody>
-                    </table>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="profitChart"></canvas>
+                    </div>
                 </div>
             </div>
 
             <!-- Earnings Calendar -->
-            <div class="card full-width">
-                <h2>📅 收益日曆</h2>
-                <div class="calendar-header">
-                    <button class="nav-btn" onclick="changeCalendarMonth(-1)">◀ 上月</button>
-                    <span class="month-label" id="calendarMonthLabel"></span>
-                    <button class="nav-btn" onclick="changeCalendarMonth(1)">下月 ▶</button>
+            <div class="card full-width draggable-card" data-card-id="calendar">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>📅 收益日曆</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
                 </div>
-                <div class="calendar-summary" id="calendarSummary"></div>
-                <div class="calendar-grid" id="calendarGrid"></div>
+                <div class="card-body">
+                    <div class="calendar-header">
+                        <button class="nav-btn" onclick="changeCalendarMonth(-1)">◀ 上月</button>
+                        <span class="month-label" id="calendarMonthLabel"></span>
+                        <button class="nav-btn" onclick="changeCalendarMonth(1)">下月 ▶</button>
+                    </div>
+                    <div class="calendar-summary" id="calendarSummary"></div>
+                    <div class="calendar-grid" id="calendarGrid"></div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="card full-width draggable-card" data-card-id="records">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>📋 績效紀錄</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
+                </div>
+                <div class="card-body">
+                    <div class="export-btns">
+                        <button class="btn btn-outline" onclick="exportCSV()">匯出 CSV</button>
+                        <button class="btn btn-outline" onclick="importCSV()">匯入 CSV</button>
+                        <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+                    </div>
+                    <div class="table-wrapper" style="margin-top: 12px;">
+                        <table id="dataTable">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>帳戶總值</th>
+                                    <th>當日獲利</th>
+                                    <th>報酬率</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1248,6 +1475,227 @@
 
         // Set default date to today
         document.getElementById('entryDate').valueAsDate = new Date();
+
+        // --- Card Order & Collapse Management ---
+        const DEFAULT_ORDER = ['stats', 'addEntry', 'profitProj', 'valueProj', 'profitBar', 'calendar', 'records'];
+        // Note: Default HTML order already places calendar before records
+        const CARD_ORDER_KEY = 'stockCardOrder';
+        const CARD_COLLAPSE_KEY = 'stockCardCollapsed';
+
+        function getSavedOrder() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(CARD_ORDER_KEY));
+                if (Array.isArray(saved) && saved.length === DEFAULT_ORDER.length) return saved;
+            } catch(e) {}
+            return DEFAULT_ORDER;
+        }
+
+        function saveCardOrder(order) {
+            localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(order));
+        }
+
+        function getCollapsedCards() {
+            try {
+                return JSON.parse(localStorage.getItem(CARD_COLLAPSE_KEY)) || {};
+            } catch(e) { return {}; }
+        }
+
+        function saveCollapsedCards(map) {
+            localStorage.setItem(CARD_COLLAPSE_KEY, JSON.stringify(map));
+        }
+
+        function applyCardOrder() {
+            const container = document.getElementById('cardContainer');
+            const order = getSavedOrder();
+            const projBox = container.querySelector('.projection-box');
+            const cards = {};
+            container.querySelectorAll('.draggable-card').forEach(c => {
+                cards[c.dataset.cardId] = c;
+            });
+            order.forEach(id => {
+                if (cards[id]) container.appendChild(cards[id]);
+            });
+        }
+
+        function applyCollapsedState() {
+            const collapsed = getCollapsedCards();
+            document.querySelectorAll('.draggable-card').forEach(card => {
+                const id = card.dataset.cardId;
+                const body = card.querySelector('.card-body');
+                const btn = card.querySelector('.toggle-btn');
+                if (collapsed[id]) {
+                    body.classList.add('collapsed');
+                    card.classList.add('collapsed-card');
+                    btn.textContent = '\u25b6';
+                } else {
+                    body.classList.remove('collapsed');
+                    card.classList.remove('collapsed-card');
+                    btn.textContent = '\u25bc';
+                }
+            });
+        }
+
+        // Toggle collapse/expand
+        document.querySelectorAll('.draggable-card .toggle-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const card = this.closest('.draggable-card');
+                const body = card.querySelector('.card-body');
+                const collapsed = getCollapsedCards();
+                const id = card.dataset.cardId;
+
+                if (body.classList.contains('collapsed')) {
+                    body.classList.remove('collapsed');
+                    card.classList.remove('collapsed-card');
+                    this.textContent = '\u25bc';
+                    delete collapsed[id];
+                    // Re-render charts if expanding a chart card
+                    if (['profitProj', 'valueProj', 'profitBar'].includes(id)) {
+                        setTimeout(() => updateCharts(), 50);
+                    }
+                    if (id === 'calendar') {
+                        setTimeout(() => renderCalendar(), 50);
+                    }
+                } else {
+                    body.classList.add('collapsed');
+                    card.classList.add('collapsed-card');
+                    this.textContent = '\u25b6';
+                    collapsed[id] = true;
+                }
+                saveCollapsedCards(collapsed);
+            });
+        });
+
+        // Drag and Drop
+        let draggedCard = null;
+
+        document.querySelectorAll('.draggable-card .card-header').forEach(header => {
+            header.addEventListener('dragstart', function(e) {
+                draggedCard = this.closest('.draggable-card');
+                draggedCard.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', draggedCard.dataset.cardId);
+            });
+
+            header.addEventListener('dragend', function() {
+                if (draggedCard) draggedCard.classList.remove('dragging');
+                draggedCard = null;
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            });
+        });
+
+        document.querySelectorAll('.draggable-card').forEach(card => {
+            card.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (draggedCard && this !== draggedCard) {
+                    this.classList.add('drag-over');
+                }
+            });
+
+            card.addEventListener('dragleave', function() {
+                this.classList.remove('drag-over');
+            });
+
+            card.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                if (!draggedCard || this === draggedCard) return;
+
+                const container = document.getElementById('cardContainer');
+                const allCards = [...container.querySelectorAll('.draggable-card')];
+                const fromIdx = allCards.indexOf(draggedCard);
+                const toIdx = allCards.indexOf(this);
+
+                if (fromIdx < toIdx) {
+                    this.parentNode.insertBefore(draggedCard, this.nextSibling);
+                } else {
+                    this.parentNode.insertBefore(draggedCard, this);
+                }
+
+                // Save new order
+                const newOrder = [...container.querySelectorAll('.draggable-card')].map(c => c.dataset.cardId);
+                saveCardOrder(newOrder);
+
+                // Re-render charts after reorder
+                setTimeout(() => updateCharts(), 100);
+            });
+        });
+
+        // Touch drag support for mobile
+        let touchDragCard = null;
+        let touchStartY = 0;
+        let touchClone = null;
+
+        document.querySelectorAll('.draggable-card .card-header').forEach(header => {
+            header.addEventListener('touchstart', function(e) {
+                if (e.touches.length !== 1) return;
+                touchDragCard = this.closest('.draggable-card');
+                touchStartY = e.touches[0].clientY;
+                // Long press to start drag
+                this._touchTimer = setTimeout(() => {
+                    touchDragCard.classList.add('dragging');
+                    touchDragCard.style.zIndex = '100';
+                }, 300);
+            }, { passive: true });
+
+            header.addEventListener('touchmove', function(e) {
+                if (!touchDragCard) return;
+                clearTimeout(this._touchTimer);
+                if (!touchDragCard.classList.contains('dragging')) return;
+                e.preventDefault();
+
+                const touch = e.touches[0];
+                const container = document.getElementById('cardContainer');
+                const cards = [...container.querySelectorAll('.draggable-card')];
+
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+
+                const target = cards.find(c => {
+                    if (c === touchDragCard) return false;
+                    const rect = c.getBoundingClientRect();
+                    return touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+                });
+
+                if (target) target.classList.add('drag-over');
+            }, { passive: false });
+
+            header.addEventListener('touchend', function(e) {
+                clearTimeout(this._touchTimer);
+                if (!touchDragCard || !touchDragCard.classList.contains('dragging')) {
+                    touchDragCard = null;
+                    return;
+                }
+
+                const container = document.getElementById('cardContainer');
+                const overCard = container.querySelector('.drag-over');
+
+                if (overCard) {
+                    const cards = [...container.querySelectorAll('.draggable-card')];
+                    const fromIdx = cards.indexOf(touchDragCard);
+                    const toIdx = cards.indexOf(overCard);
+
+                    if (fromIdx < toIdx) {
+                        overCard.parentNode.insertBefore(touchDragCard, overCard.nextSibling);
+                    } else {
+                        overCard.parentNode.insertBefore(touchDragCard, overCard);
+                    }
+
+                    const newOrder = [...container.querySelectorAll('.draggable-card')].map(c => c.dataset.cardId);
+                    saveCardOrder(newOrder);
+                    setTimeout(() => updateCharts(), 100);
+                }
+
+                touchDragCard.classList.remove('dragging');
+                touchDragCard.style.zIndex = '';
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                touchDragCard = null;
+            });
+        });
+
+        // Apply saved order and collapsed state on load
+        applyCardOrder();
+        applyCollapsedState();
 
         // Initialize: load from GitHub first, fallback to local
         loadFromGitHub().then(() => refreshAll());
