@@ -622,6 +622,7 @@
                     </div>
                 </div>
                 <div class="projection-detail" id="projectionDetail"></div>
+                <div class="projection-detail" id="projectionMilestone" style="margin-top:4px;border-top:1px solid rgba(255,255,255,0.2);padding-top:4px;"></div>
             </div>
 
             <!-- Stats Card -->
@@ -1017,6 +1018,21 @@
             document.getElementById('projectionDate').textContent = dateStr;
             document.getElementById('projectionDetail').textContent = 
                 `需要約 ${daysNeeded} 個交易日 | 帳戶需成長至 ${formatCurrency(requiredValue)} | 平均日報酬率 ${(avgReturn*100).toFixed(2)}%`;
+
+            // $10M milestone
+            const milestoneTarget = 10000000;
+            const daysTo10M = Math.ceil(Math.log(milestoneTarget / currentValue) / Math.log(1 + avgReturn));
+            let tradingDays10M = 0;
+            let proj10MDate = new Date(currentDate);
+            while (tradingDays10M < daysTo10M) {
+                proj10MDate.setDate(proj10MDate.getDate() + 1);
+                const day10M = proj10MDate.getDay();
+                if (day10M !== 0 && day10M !== 6) tradingDays10M++;
+            }
+            const date10MStr = proj10MDate.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
+            const years10M = (daysTo10M / 252).toFixed(1);
+            document.getElementById('projectionMilestone').innerHTML = 
+                `💎 總資產達 <strong>$10,000,000</strong>：預計 <strong>${date10MStr}</strong>（約 ${daysTo10M} 個交易日 / ${years10M} 年）`;
         }
 
         function updateStats() {
