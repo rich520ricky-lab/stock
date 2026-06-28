@@ -870,6 +870,7 @@
             const data = await githubRead();
             if (data && data.length > 0) {
                 performanceData = data;
+                recalculateAllValues();
                 localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
                 setSyncStatus(githubPAT ? 'synced' : 'readonly');
                 refreshAll();
@@ -897,6 +898,17 @@
         }
 
 
+
+        function recalculateAllValues() {
+            if (performanceData.length < 2) return;
+            performanceData.sort((a, b) => a.date.localeCompare(b.date));
+            for (let i = 1; i < performanceData.length; i++) {
+                const prev = performanceData[i - 1];
+                const curr = performanceData[i];
+                curr.value = prev.value + curr.profit;
+                curr.returnPct = (curr.profit / prev.value) * 100;
+            }
+        }
 
         function formatCurrency(amount) {
             return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -939,23 +951,16 @@
                 return;
             }
 
-            // Auto-calculate value and return from last entry
-            const sorted = [...performanceData].sort((a, b) => a.date.localeCompare(b.date));
-            const lastEntry = sorted[sorted.length - 1];
-            const calculatedValue = lastEntry.value + profit;
-            const calculatedReturn = (profit / lastEntry.value) * 100;
-
-            const newEntry = { date, value: calculatedValue, profit, returnPct: calculatedReturn };
-
             // Check for duplicate date
             const existingIdx = performanceData.findIndex(d => d.date === date);
             if (existingIdx >= 0) {
-                performanceData[existingIdx] = newEntry;
+                performanceData[existingIdx].profit = profit;
             } else {
-                performanceData.push(newEntry);
+                performanceData.push({ date, value: 0, profit, returnPct: 0 });
             }
 
             performanceData.sort((a, b) => a.date.localeCompare(b.date));
+            recalculateAllValues();
             saveData();
             refreshAll();
 
@@ -970,6 +975,7 @@
         function deleteEntry(index) {
             if (confirm('確定要刪除這筆紀錄？')) {
                 performanceData.splice(index, 1);
+                recalculateAllValues();
                 saveData();
                 refreshAll();
             }
@@ -1431,6 +1437,7 @@
         }
 
         function refreshAll() {
+            recalculateAllValues();
             updateStats();
             updateTable();
             updateCharts();
@@ -1492,6 +1499,7 @@
                     }
                 }
                 performanceData.sort((a, b) => a.date.localeCompare(b.date));
+                recalculateAllValues();
                 saveData();
                 refreshAll();
                 showNotification('CSV 匯入成功！', 'success');
