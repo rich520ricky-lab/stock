@@ -125,6 +125,13 @@
       "profit": 4335.4,
       "returnPct": 1.6708269051614,
       "cashflow": 0
+    },
+    {
+      "date": "2026-06-29",
+      "value": 272427.04,
+      "profit": 8615.33,
+      "returnPct": 3.265711745699234,
+      "cashflow": 0
     }
   ],
   "cashflows": []
