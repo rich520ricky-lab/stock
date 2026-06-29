@@ -712,6 +712,30 @@
                 </div>
             </div>
 
+            <!-- Cashflow History -->
+            <div class="card draggable-card" data-card-id="cashflowHistory">
+                <div class="card-header" draggable="true">
+                    <span class="drag-handle">⠿</span>
+                    <h2>📜 存提款紀錄</h2>
+                    <button class="toggle-btn" title="摺疊/展開">▼</button>
+                </div>
+                <div class="card-body">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>類型</th>
+                                    <th>金額</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cashflowTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Daily Profit Projection Chart -->
             <div class="card full-width draggable-card" data-card-id="profitProj">
                 <div class="card-header" draggable="true">
@@ -815,6 +839,7 @@
 
         // Data storage
         let performanceData = JSON.parse(localStorage.getItem('stockPerformance') || '[]');
+        let cashflowRecords = JSON.parse(localStorage.getItem('stockCashflows') || '[]');
 
         // Default seed data
         const seedData = [
@@ -881,6 +906,7 @@
 
         function saveData() {
             localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
+            localStorage.setItem('stockCashflows', JSON.stringify(cashflowRecords));
             syncToGitHub();
         }
 
@@ -890,16 +916,30 @@
                 return;
             }
             setSyncStatus('syncing');
-            const ok = await githubWrite(performanceData);
+            const ok = await githubWrite({ entries: performanceData, cashflows: cashflowRecords });
             setSyncStatus(ok ? 'synced' : 'error');
         }
 
         async function loadFromGitHub() {
             const data = await githubRead();
-            if (data && data.length > 0) {
-                performanceData = data;
+            if (data) {
+                if (Array.isArray(data) && data.length > 0) {
+                    performanceData = data;
+                    cashflowRecords = [];
+                } else if (data.entries && data.entries.length > 0) {
+                    performanceData = data.entries;
+                    cashflowRecords = data.cashflows || [];
+                } else {
+                    if (performanceData.length === 0) {
+                        performanceData = [...seedData];
+                        saveData();
+                    }
+                    return;
+                }
+                applyCashflowToEntries();
                 recalculateAllValues();
                 localStorage.setItem('stockPerformance', JSON.stringify(performanceData));
+                localStorage.setItem('stockCashflows', JSON.stringify(cashflowRecords));
                 setSyncStatus(githubPAT ? 'synced' : 'readonly');
                 refreshAll();
                 return;
@@ -927,7 +967,19 @@
 
 
 
+        function applyCashflowToEntries() {
+            performanceData.forEach(d => { d.cashflow = 0; });
+            cashflowRecords.forEach(cf => {
+                const entry = performanceData.find(d => d.date === cf.date);
+                if (entry) {
+                    const amt = cf.type === 'deposit' ? cf.amount : -cf.amount;
+                    entry.cashflow = (entry.cashflow || 0) + amt;
+                }
+            });
+        }
+
         function recalculateAllValues() {
+            applyCashflowToEntries();
             if (performanceData.length < 2) return;
             performanceData.sort((a, b) => a.date.localeCompare(b.date));
             for (let i = 1; i < performanceData.length; i++) {
@@ -1024,13 +1076,11 @@
                 return;
             }
 
-            const cashflow = type === 'deposit' ? amount : -amount;
+            cashflowRecords.push({ id: Date.now(), date, type, amount });
 
             const existingIdx = performanceData.findIndex(d => d.date === date);
-            if (existingIdx >= 0) {
-                performanceData[existingIdx].cashflow = (performanceData[existingIdx].cashflow || 0) + cashflow;
-            } else {
-                performanceData.push({ date, value: 0, profit: 0, returnPct: 0, cashflow });
+            if (existingIdx < 0) {
+                performanceData.push({ date, value: 0, profit: 0, returnPct: 0, cashflow: 0 });
             }
 
             performanceData.sort((a, b) => a.date.localeCompare(b.date));
@@ -1041,6 +1091,37 @@
             document.getElementById('cashflowAmount').value = '';
             const label = type === 'deposit' ? '存款' : '提款';
             showNotification(`${label} ${formatCurrency(amount)} 已新增！`, 'success');
+        }
+
+        function deleteCashflow(id) {
+            if (confirm('確定要刪除這筆存提款紀錄？')) {
+                cashflowRecords = cashflowRecords.filter(r => r.id !== id);
+                recalculateAllValues();
+                saveData();
+                refreshAll();
+            }
+        }
+
+        function updateCashflowHistory() {
+            const tbody = document.getElementById('cashflowTableBody');
+            if (!tbody) return;
+            const sorted = [...cashflowRecords].sort((a, b) => b.date.localeCompare(a.date));
+            if (sorted.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">尚無存提款紀錄</td></tr>';
+                return;
+            }
+            tbody.innerHTML = sorted.map(r => {
+                const isDeposit = r.type === 'deposit';
+                const label = isDeposit ? '存款' : '提款';
+                const color = isDeposit ? 'var(--primary)' : '#e67e22';
+                const sign = isDeposit ? '+' : '-';
+                return `<tr>
+                    <td>${r.date}</td>
+                    <td style="color:${color}">${label}</td>
+                    <td style="color:${color}">${sign}${formatCurrency(r.amount)}</td>
+                    <td><button class="btn btn-danger" onclick="deleteCashflow(${r.id})">刪除</button></td>
+                </tr>`;
+            }).join('');
         }
 
         function updateProjection() {
@@ -1513,6 +1594,7 @@
             recalculateAllValues();
             updateStats();
             updateTable();
+            updateCashflowHistory();
             updateCharts();
             updateProjection();
             renderCalendar();
@@ -1587,14 +1669,18 @@
         document.getElementById('cashflowDate').valueAsDate = new Date();
 
         // --- Card Order & Collapse Management ---
-        const DEFAULT_ORDER = ['stats', 'addEntry', 'cashflow', 'profitProj', 'valueProj', 'profitBar', 'calendar', 'records'];
+        const DEFAULT_ORDER = ['stats', 'addEntry', 'cashflow', 'cashflowHistory', 'profitProj', 'valueProj', 'profitBar', 'calendar', 'records'];
         const CARD_ORDER_KEY = 'stockCardOrder';
         const CARD_COLLAPSE_KEY = 'stockCardCollapsed';
 
         function getSavedOrder() {
             try {
                 const saved = JSON.parse(localStorage.getItem(CARD_ORDER_KEY));
-                if (Array.isArray(saved) && saved.length === DEFAULT_ORDER.length) return saved;
+                if (Array.isArray(saved) && saved.length > 0) {
+                    const missing = DEFAULT_ORDER.filter(id => !saved.includes(id));
+                    const valid = saved.filter(id => DEFAULT_ORDER.includes(id));
+                    return [...valid, ...missing];
+                }
             } catch(e) {}
             return DEFAULT_ORDER;
         }
@@ -1626,13 +1712,16 @@
             });
         }
 
+        const DEFAULT_COLLAPSED = { cashflowHistory: true };
+
         function applyCollapsedState() {
             const collapsed = getCollapsedCards();
             document.querySelectorAll('.draggable-card').forEach(card => {
                 const id = card.dataset.cardId;
                 const body = card.querySelector('.card-body');
                 const btn = card.querySelector('.toggle-btn');
-                if (collapsed[id]) {
+                const isCollapsed = (id in collapsed) ? collapsed[id] : DEFAULT_COLLAPSED[id];
+                if (isCollapsed) {
                     body.classList.add('collapsed');
                     card.classList.add('collapsed-card');
                     btn.textContent = '\u25b6';
