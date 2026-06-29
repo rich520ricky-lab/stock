@@ -128,18 +128,11 @@
     },
     {
       "date": "2026-06-29",
-      "value": 246811.70999999996,
+      "value": 266811.70999999996,
       "profit": 3000,
       "returnPct": 1.13717469175269,
-      "cashflow": -20000
+      "cashflow": 0
     }
   ],
-  "cashflows": [
-    {
-      "id": 1782695688779,
-      "date": "2026-06-29",
-      "type": "withdrawal",
-      "amount": 20000
-    }
-  ]
+  "cashflows": []
 }
