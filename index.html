@@ -1583,8 +1583,19 @@
             const profitSign = monthProfit >= 0 ? '+' : '';
             const avgRet = monthDays > 0 ? (monthReturnSum / monthDays) : 0;
             const avgRetSign = avgRet >= 0 ? '+' : '';
+
+            const monthStartStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-01`;
+            const sorted = [...performanceData].sort((a, b) => a.date.localeCompare(b.date));
+            const firstInMonth = sorted.find(d => d.date >= monthStartStr && d.date.startsWith(`${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}`));
+            let monthRetPct = 0;
+            if (firstInMonth && monthDays > 0) {
+                const baseValue = firstInMonth.value - firstInMonth.profit - (firstInMonth.cashflow || 0);
+                monthRetPct = baseValue > 0 ? (monthProfit / baseValue) * 100 : 0;
+            }
+            const monthRetSign = monthRetPct >= 0 ? '+' : '';
+
             summaryEl.innerHTML = `
-                <div><span class="summary-label">本月收益：</span><span class="summary-value" style="color:${profitColor}">${profitSign}${formatCurrency(monthProfit)}</span></div>
+                <div><span class="summary-label">本月收益：</span><span class="summary-value" style="color:${profitColor}">${profitSign}${formatCurrency(monthProfit)} (${monthRetSign}${monthRetPct.toFixed(2)}%)</span></div>
                 <div><span class="summary-label">交易天數：</span><span class="summary-value">${monthDays} 天</span></div>
                 <div><span class="summary-label">平均日收益率：</span><span class="summary-value" style="color:${profitColor}">${avgRetSign}${avgRet.toFixed(2)}%</span></div>
             `;
